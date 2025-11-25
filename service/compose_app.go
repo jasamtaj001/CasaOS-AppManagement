@@ -25,9 +25,9 @@ import (
 	"github.com/IceWhaleTech/CasaOS-Common/utils/logger"
 	"github.com/IceWhaleTech/CasaOS-Common/utils/port"
 	"github.com/IceWhaleTech/CasaOS-Common/utils/random"
-	"github.com/compose-spec/compose-go/cli"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/types"
 	composeCmd "github.com/docker/compose/v2/cmd/compose"
 
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -375,8 +375,8 @@ func (a *ComposeApp) Up(ctx context.Context, service api.Service) error {
 
 	if err := service.Up(ctx, (*codegen.ComposeApp)(a), api.UpOptions{
 		Start: api.StartOptions{
-			CascadeStop: true,
-			Wait:        true,
+			OnExit: api.CascadeStop,
+			Wait:   true,
 		},
 	}); err != nil {
 		logger.Error("failed to start original compose app", zap.Error(err), zap.String("name", a.Name))
@@ -553,8 +553,8 @@ func (a *ComposeApp) PullAndInstall(ctx context.Context) error {
 	defer PublishEventWrapper(ctx, common.EventTypeContainerStartEnd, nil)
 
 	if err := service.Start(ctx, a.Name, api.StartOptions{
-		CascadeStop: true,
-		Wait:        true,
+		OnExit: api.CascadeStop,
+		Wait:   true,
 	}); err != nil {
 		go PublishEventWrapper(ctx, common.EventTypeContainerStartError, map[string]string{
 			common.PropertyTypeMessage.Name: err.Error(),
@@ -720,8 +720,8 @@ func (a *ComposeApp) SetStatus(ctx context.Context, status codegen.RequestCompos
 			}
 
 			if err := service.Start(ctx, a.Name, api.StartOptions{
-				CascadeStop: true,
-				Wait:        true,
+				OnExit: api.CascadeStop,
+				Wait:   true,
 			}); err != nil {
 				go PublishEventWrapper(ctx, common.EventTypeAppStartError, map[string]string{
 					common.PropertyTypeMessage.Name: err.Error(),

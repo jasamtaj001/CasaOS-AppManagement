@@ -34,6 +34,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	client2 "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -72,7 +73,7 @@ type DockerService interface {
 	GetNetworkList() []types.NetworkResource
 
 	// docker server
-	GetServerInfo() (types.Info, error)
+	GetServerInfo() (system.Info, error)
 }
 
 type dockerService struct{}
@@ -480,7 +481,7 @@ func (ds *dockerService) CreateContainer(m model.CustomizationPostData, id strin
 	rp := container.RestartPolicy{}
 
 	if len(m.Restart) > 0 {
-		rp.Name = m.Restart
+		rp.Name = container.RestartPolicyMode(m.Restart)
 	}
 	// healthTest := []string{}
 	// if len(port) > 0 {
@@ -841,10 +842,10 @@ func (ds *dockerService) GetNetworkList() []types.NetworkResource {
 	return networks
 }
 
-func (ds *dockerService) GetServerInfo() (types.Info, error) {
+func (ds *dockerService) GetServerInfo() (system.Info, error) {
 	cli, err := client2.NewClientWithOpts(client2.FromEnv, client2.WithAPIVersionNegotiation())
 	if err != nil {
-		return types.Info{}, err
+		return system.Info{}, err
 	}
 	defer cli.Close()
 
