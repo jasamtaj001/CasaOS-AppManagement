@@ -6,6 +6,7 @@ toolchain go1.24.10
 
 require (
 	github.com/bluele/gcache v0.0.2
+	github.com/compose-spec/compose-go/v2 v2.1.4
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/distribution/reference v0.6.0
 	github.com/docker/compose/v2 v2.28.0
@@ -61,7 +62,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
-	github.com/compose-spec/compose-go/v2 v2.1.4 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/containerd/containerd v1.7.19 // indirect
 	github.com/containerd/containerd/api v1.7.19 // indirect
@@ -141,7 +141,6 @@ require (
 	github.com/mholt/archiver/v3 v3.5.1 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/moby/buildkit v0.15.0 // indirect

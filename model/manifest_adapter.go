@@ -138,15 +138,16 @@ func (c *CustomizationPostData) ComposeAppStoreInfo() codegen.ComposeAppStoreInf
 }
 
 func (c *CustomizationPostData) Services() types.Services {
+	serviceName := strings.ToLower(c.ContainerName)
 	return types.Services{
-		{
+		serviceName: {
 			CapAdd:      c.CapAdd,
 			Command:     emtpySliceThenNil(c.Cmd),
 			CPUShares:   c.CPUShares,
 			Devices:     c.Devices.ToSlice(),
 			Environment: c.Envs.ToMappingWithEquals(),
 			Image:       c.Image,
-			Name:        strings.ToLower(c.ContainerName),
+			Name:        serviceName,
 			NetworkMode: c.NetworkModel,
 			Ports:       c.Ports.ServicePortConfigList(),
 			Privileged:  c.Privileged,

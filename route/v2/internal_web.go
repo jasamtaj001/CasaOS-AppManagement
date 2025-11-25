@@ -150,9 +150,10 @@ func WebAppGridItemAdapterV2(composeAppWithStoreInfo *codegen.ComposeAppWithStor
 		item.IsUncontrolled = composeAppStoreInfo.IsUncontrolled
 
 		var mainApp *types.ServiceConfig
-		for i, service := range composeApp.Services {
-			if service.Name == *composeAppStoreInfo.Main {
-				mainApp = &composeApp.Services[i]
+		for serviceName, service := range composeApp.Services {
+			if serviceName == *composeAppStoreInfo.Main {
+				svc := service
+				mainApp = &svc
 				item.Image = &mainApp.Image // Hengxin needs this image property for some reason...
 			}
 			break

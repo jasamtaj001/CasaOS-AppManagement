@@ -28,7 +28,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
-	composeCmd "github.com/docker/compose/v2/cmd/compose"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
@@ -195,8 +194,8 @@ func (a *ComposeApp) Update(ctx context.Context) error {
 		return ErrNotFoundInAppStore
 	}
 
-	localComposeAppServices := lo.Map(a.Services, func(service types.ServiceConfig, i int) string { return service.Name })
-	storeComposeAppServices := lo.Map(storeComposeApp.Services, func(service types.ServiceConfig, i int) string { return service.Name })
+	localComposeAppServices := lo.Keys(a.Services)
+	storeComposeAppServices := lo.Keys(storeComposeApp.Services)
 
 	localAbsentOfStore, storeAbsentOfLocal := lo.Difference(localComposeAppServices, storeComposeAppServices)
 	if len(localAbsentOfStore) > 0 {
@@ -263,10 +262,9 @@ func (a *ComposeApp) App(name string) *App {
 		return nil
 	}
 
-	for i, service := range a.Services {
-		if service.Name == name {
-			return (*App)(&a.Services[i])
-		}
+	if service, ok := a.Services[name]; ok {
+		app := App(service)
+		return &app
 	}
 
 	return nil
@@ -275,8 +273,9 @@ func (a *ComposeApp) App(name string) *App {
 func (a *ComposeApp) Apps() map[string]*App {
 	apps := make(map[string]*App)
 
-	for i, service := range a.Services {
-		apps[service.Name] = (*App)(&a.Services[i])
+	for name, service := range a.Services {
+		app := App(service)
+		apps[name] = &app
 	}
 
 	return apps
@@ -329,8 +328,11 @@ func (a *ComposeApp) Containers(ctx context.Context) (map[string][]api.Container
 func (a *ComposeApp) Pull(ctx context.Context) error {
 	// pull
 	serviceNum := len(a.Services)
+	serviceIndex := 0
 
-	for i, app := range a.Services {
+	for _, app := range a.Services {
+		serviceIndex++
+		currentIndex := serviceIndex
 		if err := func() error {
 			go PublishEventWrapper(ctx, common.EventTypeImagePullBegin, map[string]string{
 				common.PropertyTypeImageName.Name: app.Image,
@@ -341,7 +343,7 @@ func (a *ComposeApp) Pull(ctx context.Context) error {
 			})
 
 			if err := docker.PullImage(ctx, app.Image, func(out io.ReadCloser) {
-				pullImageProgress(ctx, out, "INSTALL", serviceNum, i+1)
+				pullImageProgress(ctx, out, "INSTALL", serviceNum, currentIndex)
 			}); err != nil {
 				go PublishEventWrapper(ctx, common.EventTypeImagePullError, map[string]string{
 					common.PropertyTypeImageName.Name: app.Image,
@@ -387,7 +389,7 @@ func (a *ComposeApp) Up(ctx context.Context, service api.Service) error {
 
 func (a *ComposeApp) UpWithCheckRequire(ctx context.Context, service api.Service) error {
 	// prepare source path for volumes if not exist
-	for i, app := range a.Services {
+	for serviceName, app := range a.Services {
 		for _, volume := range app.Volumes {
 			if _, ok := a.Volumes[volume.Source]; ok {
 				// this is a internal volume, so skip.
@@ -413,7 +415,8 @@ func (a *ComposeApp) UpWithCheckRequire(ctx context.Context, service api.Service
 			}
 			deviceMapFiltered = append(deviceMapFiltered, deviceMap)
 		}
-		a.Services[i].Devices = deviceMapFiltered
+		app.Devices = deviceMapFiltered
+		a.Services[serviceName] = app
 	}
 
 	if err := a.Up(ctx, service); err != nil {
@@ -506,7 +509,7 @@ func (a *ComposeApp) PullAndInstall(ctx context.Context) error {
 
 		defer PublishEventWrapper(ctx, common.EventTypeContainerCreateEnd, nil)
 
-		for i, app := range a.Services {
+		for serviceName, app := range a.Services {
 			// prepare source path for volumes if not exist
 			for _, volume := range app.Volumes {
 				if _, ok := a.Volumes[volume.Source]; ok {
@@ -533,7 +536,8 @@ func (a *ComposeApp) PullAndInstall(ctx context.Context) error {
 				}
 				deviceMapFiltered = append(deviceMapFiltered, deviceMap)
 			}
-			a.Services[i].Devices = deviceMapFiltered
+			app.Devices = deviceMapFiltered
+			a.Services[serviceName] = app
 		}
 
 		if err := a.Create(ctx, api.CreateOptions{}, service); err != nil {
@@ -778,7 +782,7 @@ func (a *ComposeApp) Logs(ctx context.Context, lines int) ([]byte, error) {
 
 	if err := service.Logs(ctx, a.Name, consumer, api.LogOptions{
 		Project:  (*codegen.ComposeApp)(a),
-		Services: lo.Map(a.Services, func(s types.ServiceConfig, i int) string { return s.Name }),
+		Services: lo.Keys(a.Services),
 		Follow:   false,
 		Tail:     lo.If(lines < 0, "all").Else(strconv.Itoa(lines)),
 	}); err != nil {
@@ -896,30 +900,31 @@ func (a *ComposeApp) HealthCheck() (bool, error) {
 }
 
 func LoadComposeAppFromConfigFile(appID string, configFile string) (*ComposeApp, error) {
-	options := composeCmd.ProjectOptions{
-		ProjectDir:  filepath.Dir(configFile),
-		ProjectName: appID,
-	}
+	projectDir := filepath.Dir(configFile)
 
 	env := []string{fmt.Sprintf("%s=%s", "AppID", appID)}
 	for k, v := range baseInterpolationMap() {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// load project
-	project, err := options.ToProject(
-		nil,
-		nil,
-		cli.WithWorkingDirectory(options.ProjectDir), // this has to be the first option, otherwise it will assume the dir where this program is running is the working directory.
-
+	// Create project options using compose-go/v2 CLI
+	projectOptions, err := cli.NewProjectOptions(
+		[]string{configFile},
+		cli.WithWorkingDirectory(projectDir),
 		cli.WithOsEnv,
 		cli.WithDotEnv,
 		cli.WithEnv(env),
-		cli.WithConfigFileEnv,
-		cli.WithDefaultConfigPath,
-		cli.WithEnvFiles(options.EnvFiles...),
-		cli.WithName(options.ProjectName),
+		cli.WithName(appID),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	// load project
+	project, err := projectOptions.LoadProject(context.Background())
+	if err != nil {
+		return nil, err
+	}
 
 	return (*ComposeApp)(project), err
 }
@@ -941,8 +946,9 @@ func removeRuntime(a *ComposeApp) {
 			// without nvidia-smi 	// no gpu or first time fetching gpu info failed
 		}
 		if len(*gpuCache) == 0 {
-			for i := range a.Services {
-				a.Services[i].Runtime = ""
+			for serviceName, service := range a.Services {
+				service.Runtime = ""
+				a.Services[serviceName] = service
 			}
 		}
 	}
@@ -1034,11 +1040,12 @@ func NewComposeAppFromYAML(yaml []byte, skipInterpolation, skipValidation bool) 
 	// still using `func getContainerStats()` from `container.go` to get container stats
 	// (we are being lazy to upgrade that v1 API to v2 - please help if you can :D)
 	if err == nil && storeInfo != nil && storeInfo.Icon != "" {
-		for i := range composeApp.Services {
-			if composeApp.Services[i].Labels == nil {
-				composeApp.Services[i].Labels = map[string]string{}
+		for serviceName, service := range composeApp.Services {
+			if service.Labels == nil {
+				service.Labels = map[string]string{}
 			}
-			composeApp.Services[i].Labels[v1.V1LabelIcon] = storeInfo.Icon
+			service.Labels[v1.V1LabelIcon] = storeInfo.Icon
+			composeApp.Services[serviceName] = service
 		}
 	}
 
