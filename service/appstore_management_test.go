@@ -106,7 +106,14 @@ func TestIsUpgradable(t *testing.T) {
 
 	storeComposeApp.SetStoreAppID("test")
 
-	storeMainAppImage, _ := docker.ExtractImageAndTag(storeComposeApp.Services[0].Image)
+	// Get the first service name from the map
+	var firstServiceName string
+	for name := range storeComposeApp.Services {
+		firstServiceName = name
+		break
+	}
+
+	storeMainAppImage, _ := docker.ExtractImageAndTag(storeComposeApp.Services[firstServiceName].Image)
 
 	storeComposeAppStoreInfo, err := storeComposeApp.StoreInfo(false)
 	assert.NilError(t, err)
@@ -129,7 +136,10 @@ func TestIsUpgradable(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Assert(t, !upgradable)
 
-	storeComposeApp.Services[0].Image = storeMainAppImage + ":test"
+	// Update the first service's image
+	svc := storeComposeApp.Services[firstServiceName]
+	svc.Image = storeMainAppImage + ":test"
+	storeComposeApp.Services[firstServiceName] = svc
 
 	upgradable, err = appStoreManagement.IsUpdateAvailableWith(localComposeApp, storeComposeApp)
 	assert.NilError(t, err)

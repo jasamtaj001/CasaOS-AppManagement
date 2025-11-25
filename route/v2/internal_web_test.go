@@ -55,8 +55,15 @@ func TestWebAppGridItemAdapter(t *testing.T) {
 	gridItem, err := v2.WebAppGridItemAdapterV2(&composeAppWithStoreInfo)
 	assert.NilError(t, err)
 
+	// Get the first service from the map
+	var firstService string
+	for name := range composeApp.Services {
+		firstService = name
+		break
+	}
+
 	assert.Equal(t, *gridItem.Icon, storeInfo.Icon)
-	assert.Equal(t, *gridItem.Image, composeApp.Services[0].Image)
+	assert.Equal(t, *gridItem.Image, composeApp.Services[firstService].Image)
 	assert.Equal(t, gridItem.Hostname, storeInfo.Hostname)
 	assert.Equal(t, *gridItem.Port, storeInfo.PortMap)
 	assert.Equal(t, *gridItem.Index, storeInfo.Index)
